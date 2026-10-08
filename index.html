@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Subscription Tracker</title>
+
+<!--
+  HOW THIS FILE IS ORGANIZED (read top to bottom):
+  1. <style>  = CSS: how everything LOOKS (colors, spacing, fonts)
+  2. <body>   = HTML: the STRUCTURE (form, totals, list)
+  3. <script> = JavaScript: the BEHAVIOR (saving, math, buttons)
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+
+<style>
+  /* ---------- 1. COLORS ----------
+     "Variables" (the --names) let us define a color once and reuse it.
+     Change a value here and the whole app updates. */
+  :root {
+    --bg: #eaf0f5;        /* page background */
+    --card: #ffffff;      /* boxes */
+    --ink: #13233a;       /* main text */
+    --muted: #5d6f85;     /* secondary text */
+    --line: #d3dde8;      /* thin borders */
+    --accent: #0f766e;    /* buttons and highlights */
+    --accent-ink: #ffffff;/* text on accent buttons */
+    --warn: #b45309;      /* "renews soon" color */
+    --danger: #b91c1c;    /* delete button */
+
+    /* Safe-area padding keeps content clear of phone notches */
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* Dark mode: used automatically if the phone is set to dark */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1724; --card: #16263a; --ink: #e6eef7; --muted: #93a5bb;
+      --line: #263b55; --accent: #2dd4bf; --accent-ink: #062b27;
+      --warn: #fbbf24; --danger: #f87171;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1724; --card: #16263a; --ink: #e6eef7; --muted: #93a5bb;
+    --line: #263b55; --accent: #2dd4bf; --accent-ink: #062b27;
+    --warn: #fbbf24; --danger: #f87171;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+  /* ---------- 2. BASE STYLES ---------- */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.6rem; font-weight: 800; margin: 8px 0 16px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 24px 0 10px; }
+
+  /* ---------- 3. TOTALS (the one memorable element) ---------- */
+  .totals {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 18px;
+    padding: 20px;
+  }
+  .totals .big { font-size: 2.8rem; font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
+  .totals .sub { margin-top: 6px; opacity: 0.85; }
+
+  /* ---------- 4. FORM ---------- */
+  form {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+  }
+  label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+  input, select {
+    font: inherit;          /* use the same font as the page */
+    font-size: 1rem;        /* 16px+ stops iPhones zooming in */
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    width: 100%;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    border: 0; border-radius: 8px; padding: 12px 16px;
+  }
+  .primary { background: var(--accent); color: var(--accent-ink); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- 5. LIST ---------- */
+  .sub-item {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .sub-item .name { font-weight: 600; }
+  .sub-item .meta { font-size: 0.85rem; color: var(--muted); }
+  .sub-item .meta.soon { color: var(--warn); font-weight: 600; }
+  .sub-item .price { font-weight: 600; text-align: right; white-space: nowrap; }
+  .del { background: transparent; color: var(--danger); padding: 6px 8px; font-size: 0.85rem; }
+  .empty { color: var(--muted); padding: 16px 0; }
+  .error { color: var(--danger); font-size: 0.9rem; min-height: 1.2em; }
+</style>
+</head>
+
+<body>
+<main>
+  <h1>Subscription Tracker</h1>
+
+  <!-- Totals box. JavaScript fills in the numbers (see render() below). -->
+  <section class="totals" aria-live="polite">
+    <div class="big" id="monthlyTotal">$0.00</div>
+    <div class="sub" id="yearlyTotal">per month · $0.00 per year</div>
+  </section>
+
+  <h2>Add a subscription</h2>
+  <!-- The form. "id" names let JavaScript find each field. -->
+  <form id="addForm" autocomplete="off">
+    <label>Name
+      <input id="name" type="text" placeholder="Netflix" maxlength="60" required>
+    </label>
+    <div class="row">
+      <label>Cost ($)
+        <input id="cost" type="number" step="0.01" min="0" inputmode="decimal" placeholder="15.99" required>
+      </label>
+      <label>Billed
+        <select id="cycle">
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </label>
+    </div>
+    <label>Next renewal date
+      <input id="date" type="date" required>
+    </label>
+    <div class="error" id="error" role="alert"></div>
+    <button class="primary" type="submit">Add subscription</button>
+  </form>
+
+  <h2>Your subscriptions</h2>
+  <div id="list"></div>
+</main>
+
+<script>
+  // ---------- 1. DATA ----------
+  // "subs" is an array (a list) of subscription objects, like:
+  // { id: 123, name: "Netflix", cost: 15.99, cycle: "monthly", date: "2026-11-01" }
+  const STORAGE_KEY = "subscriptions-v1";
+  let subs = loadSubs();
+
+  // Load saved data from the browser's localStorage (a small notepad
+  // inside your browser). try/catch means: if storage is blocked or
+  // broken, don't crash, just start with an empty list.
+  function loadSubs() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Save the current list. Call this after every change.
+  function saveSubs() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
+    } catch (e) {
+      // Ignore: the app still works, it just won't remember data.
+    }
+  }
+
+  // ---------- 2. HELPER FUNCTIONS ----------
+  // Turn a number into money text, e.g. 5 -> "$5.00"
+  const money = n => "$" + n.toFixed(2);
+
+  // Cost per month: yearly plans are divided by 12.
+  const perMonth = s => (s.cycle === "yearly" ? s.cost / 12 : s.cost);
+
+  // If a renewal date is in the past, move it forward by the billing
+  // cycle until it's in the future, so dates stay correct over time.
+  function nextRenewal(s) {
+    const d = new Date(s.date + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    while (d < today) {
+      if (s.cycle === "yearly") d.setFullYear(d.getFullYear() + 1);
+      else d.setMonth(d.getMonth() + 1);
+    }
+    return d;
+  }
+
+  // How many days until a date?
+  function daysUntil(d) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((d - today) / 86400000); // 86,400,000 ms in a day
+  }
+
+  // ---------- 3. DRAWING THE SCREEN ----------
+  // render() rebuilds the totals and the list from the "subs" data.
+  // Rule of thumb: change the data, then call render().
+  function render() {
+    // Totals
+    const monthly = subs.reduce((sum, s) => sum + perMonth(s), 0);
+    document.getElementById("monthlyTotal").textContent = money(monthly);
+    document.getElementById("yearlyTotal").textContent =
+      "per month · " + money(monthly * 12) + " per year";
+
+    // List
+    const list = document.getElementById("list");
+    list.replaceChildren(); // clear old items
+
+    if (subs.length === 0) {
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "Nothing here yet. Add your first subscription above.";
+      list.appendChild(p);
+      return;
+    }
+
+    // Sort so the soonest renewal is first
+    const sorted = [...subs].sort((a, b) => nextRenewal(a) - nextRenewal(b));
+
+    for (const s of sorted) {
+      const next = nextRenewal(s);
+      const days = daysUntil(next);
+
+      // We build elements with textContent (not innerHTML) so that
+      // anything typed into the form can never run as code. Good habit!
+      const item = document.createElement("div");
+      item.className = "sub-item";
+
+      const left = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = s.name;
+      const meta = document.createElement("div");
+      meta.className = "meta" + (days <= 7 ? " soon" : "");
+      meta.textContent =
+        (days === 0 ? "Renews today" : days === 1 ? "Renews tomorrow" : "Renews in " + days + " days") +
+        " · " + next.toLocaleDateString();
+      left.append(name, meta);
+
+      const right = document.createElement("div");
+      right.className = "price";
+      right.textContent = money(s.cost) + (s.cycle === "yearly" ? "/yr" : "/mo");
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "Delete";
+      del.setAttribute("aria-label", "Delete " + s.name);
+      del.addEventListener("click", () => removeSub(s.id));
+      right.append(document.createElement("br"), del);
+
+      item.append(left, right);
+      list.appendChild(item);
+    }
+  }
+
+  // ---------- 4. ACTIONS ----------
+  function addSub(e) {
+    e.preventDefault(); // stop the page from reloading when the form submits
+
+    const name = document.getElementById("name").value.trim();
+    const cost = parseFloat(document.getElementById("cost").value);
+    const cycle = document.getElementById("cycle").value;
+    const date = document.getElementById("date").value;
+    const error = document.getElementById("error");
+
+    // Validate: check the input before trusting it
+    if (!name || isNaN(cost) || cost < 0 || !date) {
+      error.textContent = "Enter a name, a cost of 0 or more, and a renewal date.";
+      return;
+    }
+    error.textContent = "";
+
+    // Date.now() gives a unique number we use as an ID
+    subs.push({ id: Date.now(), name, cost, cycle, date });
+    saveSubs();
+    render();
+    e.target.reset(); // clear the form
+  }
+
+  function removeSub(id) {
+    // filter keeps everything EXCEPT the one with this id
+    subs = subs.filter(s => s.id !== id);
+    saveSubs();
+    render();
+  }
+
+  // ---------- 5. START THE APP ----------
+  // Connect the form to addSub, then draw the screen once.
+  document.getElementById("addForm").addEventListener("submit", addSub);
+  render();
+</script>
+</body>
+</html>
