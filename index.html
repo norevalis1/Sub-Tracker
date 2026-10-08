@@ -6,56 +6,55 @@
 <title>Subscription Tracker</title>
 
 <!--
-  HOW THIS FILE IS ORGANIZED (read top to bottom):
-  1. <style>  = CSS: how everything LOOKS (colors, spacing, fonts)
-  2. <body>   = HTML: the STRUCTURE (form, totals, list)
-  3. <script> = JavaScript: the BEHAVIOR (saving, math, buttons)
+  VERSION 2 - WHAT'S NEW (search for the "NEW:" comments to find each change)
+  1. Cozy neutral colors (see the COLORS section in the CSS)
+  2. Category dropdown in the form
+  3. Edit button on every subscription
+  4. "Spending by category" bars under your total
+
+  FILE LAYOUT: <style> = looks, <body> = structure, <script> = behavior
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
 
 <style>
-  /* ---------- 1. COLORS ----------
-     "Variables" (the --names) let us define a color once and reuse it.
-     Change a value here and the whole app updates. */
+  /* ---------- COLORS ----------
+     NEW: warm, cozy neutrals (oatmeal, walnut, soft charcoal).
+     To re-theme the whole app, change only the values in this block. */
   :root {
-    --bg: #eaf0f5;        /* page background */
-    --card: #ffffff;      /* boxes */
-    --ink: #13233a;       /* main text */
-    --muted: #5d6f85;     /* secondary text */
-    --line: #d3dde8;      /* thin borders */
-    --accent: #0f766e;    /* buttons and highlights */
-    --accent-ink: #ffffff;/* text on accent buttons */
-    --warn: #b45309;      /* "renews soon" color */
-    --danger: #b91c1c;    /* delete button */
-
-    /* Safe-area padding keeps content clear of phone notches */
+    --bg: #e9e3d9;        /* oatmeal page background */
+    --card: #f6f2ea;      /* soft linen boxes */
+    --ink: #2f2a24;       /* charcoal-brown text */
+    --muted: #7a6f62;     /* taupe secondary text */
+    --line: #d6cdbf;      /* sand borders */
+    --accent: #7a5c45;    /* walnut: buttons, totals, bars */
+    --accent-ink: #f6f2ea;/* text on walnut */
+    --warn: #a8641f;      /* amber: "renews soon" */
+    --danger: #a63d32;    /* brick: delete */
     box-sizing: border-box;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  /* Dark mode: used automatically if the phone is set to dark */
+  /* Dark mode (automatic when your phone is in dark mode) */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0d1724; --card: #16263a; --ink: #e6eef7; --muted: #93a5bb;
-      --line: #263b55; --accent: #2dd4bf; --accent-ink: #062b27;
-      --warn: #fbbf24; --danger: #f87171;
+      --bg: #1f1b17; --card: #2a2520; --ink: #efe8dc; --muted: #a89d8e;
+      --line: #3d362e; --accent: #d3a97f; --accent-ink: #231c15;
+      --warn: #e0a458; --danger: #e07b6e;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0d1724; --card: #16263a; --ink: #e6eef7; --muted: #93a5bb;
-    --line: #263b55; --accent: #2dd4bf; --accent-ink: #062b27;
-    --warn: #fbbf24; --danger: #f87171;
+    --bg: #1f1b17; --card: #2a2520; --ink: #efe8dc; --muted: #a89d8e;
+    --line: #3d362e; --accent: #d3a97f; --accent-ink: #231c15;
+    --warn: #e0a458; --danger: #e07b6e;
   }
   html { scroll-padding-top: env(safe-area-inset-top, 0px); }
 
-  /* ---------- 2. BASE STYLES ---------- */
+  /* ---------- BASE ---------- */
   * { box-sizing: border-box; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
+    margin: 0; background: var(--bg); color: var(--ink);
     font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
     line-height: 1.5;
   }
@@ -63,58 +62,54 @@
   h1 { font-size: 1.6rem; font-weight: 800; margin: 8px 0 16px; letter-spacing: -0.02em; }
   h2 { font-size: 1.05rem; font-weight: 600; margin: 24px 0 10px; }
 
-  /* ---------- 3. TOTALS (the one memorable element) ---------- */
-  .totals {
-    background: var(--accent);
-    color: var(--accent-ink);
-    border-radius: 18px;
-    padding: 20px;
-  }
+  /* ---------- TOTALS ---------- */
+  .totals { background: var(--accent); color: var(--accent-ink); border-radius: 18px; padding: 20px; }
   .totals .big { font-size: 2.8rem; font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
   .totals .sub { margin-top: 6px; opacity: 0.85; }
 
-  /* ---------- 4. FORM ---------- */
+  /* ---------- NEW: CATEGORY BARS ----------
+     Each row is: label on top, a track (empty bar), and a fill (colored part).
+     JavaScript sets the fill's width as a percentage. */
+  .cats { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .cat { margin-bottom: 12px; }
+  .cat:last-child { margin-bottom: 0; }
+  .cat-top { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
+  .cat-top span:last-child { color: var(--muted); }
+  .track { height: 8px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+  .fill { height: 100%; background: var(--accent); border-radius: 99px; }
+
+  /* ---------- FORM ---------- */
   form {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 16px;
-    display: grid;
-    gap: 12px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px; display: grid; gap: 12px;
   }
   label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
   input, select {
-    font: inherit;          /* use the same font as the page */
-    font-size: 1rem;        /* 16px+ stops iPhones zooming in */
-    color: var(--ink);
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 10px 12px;
-    width: 100%;
+    font: inherit; font-size: 1rem; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; width: 100%;
   }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  button {
-    font: inherit; font-weight: 600; cursor: pointer;
-    border: 0; border-radius: 8px; padding: 12px 16px;
-  }
+  button { font: inherit; font-weight: 600; cursor: pointer; border: 0; border-radius: 8px; padding: 12px 16px; }
   .primary { background: var(--accent); color: var(--accent-ink); }
+  .ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .buttons { display: grid; gap: 8px; }
   :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-  /* ---------- 5. LIST ---------- */
+  /* ---------- LIST ---------- */
   .sub-item {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 8px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 8px;
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
   }
+  .sub-item.editing { border-color: var(--accent); border-width: 2px; }
   .sub-item .name { font-weight: 600; }
   .sub-item .meta { font-size: 0.85rem; color: var(--muted); }
   .sub-item .meta.soon { color: var(--warn); font-weight: 600; }
   .sub-item .price { font-weight: 600; text-align: right; white-space: nowrap; }
-  .del { background: transparent; color: var(--danger); padding: 6px 8px; font-size: 0.85rem; }
+  .link { background: transparent; padding: 6px 8px; font-size: 0.85rem; }
+  .edit { color: var(--accent); }
+  .del { color: var(--danger); }
   .empty { color: var(--muted); padding: 16px 0; }
   .error { color: var(--danger); font-size: 0.9rem; min-height: 1.2em; }
 </style>
@@ -124,18 +119,34 @@
 <main>
   <h1>Subscription Tracker</h1>
 
-  <!-- Totals box. JavaScript fills in the numbers (see render() below). -->
   <section class="totals" aria-live="polite">
     <div class="big" id="monthlyTotal">$0.00</div>
     <div class="sub" id="yearlyTotal">per month · $0.00 per year</div>
   </section>
 
-  <h2>Add a subscription</h2>
-  <!-- The form. "id" names let JavaScript find each field. -->
+  <!-- NEW: this whole section is filled in by JavaScript -->
+  <h2>Spending by category</h2>
+  <div class="cats" id="cats"></div>
+
+  <h2 id="formTitle">Add a subscription</h2>
   <form id="addForm" autocomplete="off">
     <label>Name
       <input id="name" type="text" placeholder="Netflix" maxlength="60" required>
     </label>
+
+    <!-- NEW: category dropdown. The text between <option> tags is what you
+         see; the value="" is what gets saved. Add your own options here! -->
+    <label>Category
+      <select id="category">
+        <option value="Streaming">Streaming</option>
+        <option value="Music">Music</option>
+        <option value="Software">Software</option>
+        <option value="Fitness">Fitness</option>
+        <option value="Gaming">Gaming</option>
+        <option value="Other">Other</option>
+      </select>
+    </label>
+
     <div class="row">
       <label>Cost ($)
         <input id="cost" type="number" step="0.01" min="0" inputmode="decimal" placeholder="15.99" required>
@@ -151,7 +162,11 @@
       <input id="date" type="date" required>
     </label>
     <div class="error" id="error" role="alert"></div>
-    <button class="primary" type="submit">Add subscription</button>
+    <div class="buttons">
+      <button class="primary" type="submit" id="submitBtn">Add subscription</button>
+      <!-- NEW: only visible while editing (see startEdit / stopEdit) -->
+      <button class="ghost" type="button" id="cancelBtn" hidden>Cancel</button>
+    </div>
   </form>
 
   <h2>Your subscriptions</h2>
@@ -160,41 +175,32 @@
 
 <script>
   // ---------- 1. DATA ----------
-  // "subs" is an array (a list) of subscription objects, like:
-  // { id: 123, name: "Netflix", cost: 15.99, cycle: "monthly", date: "2026-11-01" }
+  // Same storage key as version 1, so your existing subscriptions stay.
   const STORAGE_KEY = "subscriptions-v1";
   let subs = loadSubs();
 
-  // Load saved data from the browser's localStorage (a small notepad
-  // inside your browser). try/catch means: if storage is blocked or
-  // broken, don't crash, just start with an empty list.
+  // NEW: remembers which subscription we're editing (null = none, adding new)
+  let editingId = null;
+
   function loadSubs() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+      const list = saved ? JSON.parse(saved) : [];
+      // NEW: old entries from version 1 have no category, so give them "Other"
+      return list.map(s => ({ ...s, category: s.category || "Other" }));
     } catch (e) {
       return [];
     }
   }
 
-  // Save the current list. Call this after every change.
   function saveSubs() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(subs));
-    } catch (e) {
-      // Ignore: the app still works, it just won't remember data.
-    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(subs)); } catch (e) {}
   }
 
-  // ---------- 2. HELPER FUNCTIONS ----------
-  // Turn a number into money text, e.g. 5 -> "$5.00"
+  // ---------- 2. HELPERS ----------
   const money = n => "$" + n.toFixed(2);
-
-  // Cost per month: yearly plans are divided by 12.
   const perMonth = s => (s.cycle === "yearly" ? s.cost / 12 : s.cost);
 
-  // If a renewal date is in the past, move it forward by the billing
-  // cycle until it's in the future, so dates stay correct over time.
   function nextRenewal(s) {
     const d = new Date(s.date + "T00:00:00");
     const today = new Date();
@@ -206,26 +212,79 @@
     return d;
   }
 
-  // How many days until a date?
   function daysUntil(d) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return Math.round((d - today) / 86400000); // 86,400,000 ms in a day
+    return Math.round((d - today) / 86400000);
   }
 
-  // ---------- 3. DRAWING THE SCREEN ----------
-  // render() rebuilds the totals and the list from the "subs" data.
-  // Rule of thumb: change the data, then call render().
-  function render() {
-    // Totals
-    const monthly = subs.reduce((sum, s) => sum + perMonth(s), 0);
-    document.getElementById("monthlyTotal").textContent = money(monthly);
-    document.getElementById("yearlyTotal").textContent =
-      "per month · " + money(monthly * 12) + " per year";
+  // Shortcut: find an element by its id
+  const $ = id => document.getElementById(id);
 
-    // List
-    const list = document.getElementById("list");
-    list.replaceChildren(); // clear old items
+  // ---------- 3. DRAWING THE SCREEN ----------
+  function render() {
+    renderTotals();
+    renderCategories();
+    renderList();
+  }
+
+  function renderTotals() {
+    const monthly = subs.reduce((sum, s) => sum + perMonth(s), 0);
+    $("monthlyTotal").textContent = money(monthly);
+    $("yearlyTotal").textContent = "per month · " + money(monthly * 12) + " per year";
+  }
+
+  // NEW: add up the monthly cost for each category, then draw a bar for each.
+  function renderCategories() {
+    const box = $("cats");
+    box.replaceChildren();
+
+    if (subs.length === 0) {
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.style.margin = "0";
+      p.textContent = "Your category totals will show up here.";
+      box.appendChild(p);
+      return;
+    }
+
+    // totals looks like: { Streaming: 22.5, Software: 9.99 }
+    const totals = {};
+    for (const s of subs) {
+      totals[s.category] = (totals[s.category] || 0) + perMonth(s);
+    }
+
+    // Turn it into a list and sort biggest first
+    const rows = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    const biggest = rows[0][1]; // the longest bar = the biggest category
+
+    for (const [category, amount] of rows) {
+      const wrap = document.createElement("div");
+      wrap.className = "cat";
+
+      const top = document.createElement("div");
+      top.className = "cat-top";
+      const label = document.createElement("span");
+      label.textContent = category;
+      const value = document.createElement("span");
+      value.textContent = money(amount) + "/mo";
+      top.append(label, value);
+
+      const track = document.createElement("div");
+      track.className = "track";
+      const fill = document.createElement("div");
+      fill.className = "fill";
+      fill.style.width = (amount / biggest) * 100 + "%"; // bar length
+      track.appendChild(fill);
+
+      wrap.append(top, track);
+      box.appendChild(wrap);
+    }
+  }
+
+  function renderList() {
+    const list = $("list");
+    list.replaceChildren();
 
     if (subs.length === 0) {
       const p = document.createElement("p");
@@ -235,17 +294,14 @@
       return;
     }
 
-    // Sort so the soonest renewal is first
     const sorted = [...subs].sort((a, b) => nextRenewal(a) - nextRenewal(b));
 
     for (const s of sorted) {
       const next = nextRenewal(s);
       const days = daysUntil(next);
 
-      // We build elements with textContent (not innerHTML) so that
-      // anything typed into the form can never run as code. Good habit!
       const item = document.createElement("div");
-      item.className = "sub-item";
+      item.className = "sub-item" + (s.id === editingId ? " editing" : "");
 
       const left = document.createElement("div");
       const name = document.createElement("div");
@@ -254,59 +310,104 @@
       const meta = document.createElement("div");
       meta.className = "meta" + (days <= 7 ? " soon" : "");
       meta.textContent =
-        (days === 0 ? "Renews today" : days === 1 ? "Renews tomorrow" : "Renews in " + days + " days") +
-        " · " + next.toLocaleDateString();
+        s.category + " · " +
+        (days === 0 ? "Renews today" : days === 1 ? "Renews tomorrow" : "Renews in " + days + " days");
       left.append(name, meta);
 
       const right = document.createElement("div");
       right.className = "price";
       right.textContent = money(s.cost) + (s.cycle === "yearly" ? "/yr" : "/mo");
+
+      // NEW: Edit button next to Delete
+      const edit = document.createElement("button");
+      edit.className = "link edit";
+      edit.textContent = "Edit";
+      edit.setAttribute("aria-label", "Edit " + s.name);
+      edit.addEventListener("click", () => startEdit(s.id));
+
       const del = document.createElement("button");
-      del.className = "del";
+      del.className = "link del";
       del.textContent = "Delete";
       del.setAttribute("aria-label", "Delete " + s.name);
       del.addEventListener("click", () => removeSub(s.id));
-      right.append(document.createElement("br"), del);
 
+      right.append(document.createElement("br"), edit, del);
       item.append(left, right);
       list.appendChild(item);
     }
   }
 
   // ---------- 4. ACTIONS ----------
-  function addSub(e) {
-    e.preventDefault(); // stop the page from reloading when the form submits
 
-    const name = document.getElementById("name").value.trim();
-    const cost = parseFloat(document.getElementById("cost").value);
-    const cycle = document.getElementById("cycle").value;
-    const date = document.getElementById("date").value;
-    const error = document.getElementById("error");
+  // NEW: Edit step 1 - copy the chosen subscription INTO the form
+  function startEdit(id) {
+    const s = subs.find(x => x.id === id); // find the one with this id
+    if (!s) return;
+    editingId = id;
+    $("name").value = s.name;
+    $("category").value = s.category;
+    $("cost").value = s.cost;
+    $("cycle").value = s.cycle;
+    $("date").value = s.date;
+    $("formTitle").textContent = "Edit subscription";
+    $("submitBtn").textContent = "Save changes";
+    $("cancelBtn").hidden = false;
+    $("error").textContent = "";
+    $("addForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    renderList(); // highlights the item being edited
+  }
 
-    // Validate: check the input before trusting it
+  // NEW: put the form back to "add" mode
+  function stopEdit() {
+    editingId = null;
+    $("addForm").reset();
+    $("formTitle").textContent = "Add a subscription";
+    $("submitBtn").textContent = "Add subscription";
+    $("cancelBtn").hidden = true;
+    $("error").textContent = "";
+    renderList();
+  }
+
+  // The form's Submit button does BOTH jobs: add new, or save an edit.
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    const name = $("name").value.trim();
+    const category = $("category").value;
+    const cost = parseFloat($("cost").value);
+    const cycle = $("cycle").value;
+    const date = $("date").value;
+
     if (!name || isNaN(cost) || cost < 0 || !date) {
-      error.textContent = "Enter a name, a cost of 0 or more, and a renewal date.";
+      $("error").textContent = "Enter a name, a cost of 0 or more, and a renewal date.";
       return;
     }
-    error.textContent = "";
 
-    // Date.now() gives a unique number we use as an ID
-    subs.push({ id: Date.now(), name, cost, cycle, date });
+    if (editingId !== null) {
+      // NEW: EDIT MODE - replace the old entry's details, keep its id
+      subs = subs.map(s =>
+        s.id === editingId ? { ...s, name, category, cost, cycle, date } : s
+      );
+    } else {
+      // ADD MODE - make a brand new entry
+      subs.push({ id: Date.now(), name, category, cost, cycle, date });
+    }
+
     saveSubs();
+    stopEdit(); // resets the form and returns to add mode
     render();
-    e.target.reset(); // clear the form
   }
 
   function removeSub(id) {
-    // filter keeps everything EXCEPT the one with this id
     subs = subs.filter(s => s.id !== id);
+    if (id === editingId) stopEdit(); // don't keep editing a deleted item
     saveSubs();
     render();
   }
 
   // ---------- 5. START THE APP ----------
-  // Connect the form to addSub, then draw the screen once.
-  document.getElementById("addForm").addEventListener("submit", addSub);
+  $("addForm").addEventListener("submit", handleSubmit);
+  $("cancelBtn").addEventListener("click", stopEdit);
   render();
 </script>
 </body>
