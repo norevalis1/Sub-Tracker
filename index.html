@@ -127,6 +127,11 @@
   .del { color: var(--danger); }
   .empty { color: var(--muted); padding: 16px 0; }
   .error { color: var(--danger); font-size: 0.9rem; min-height: 1.2em; }
+  .error.ok { color: var(--muted); }
+
+  /* ---------- BACKUP ---------- */
+  .backup { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+  .backup .note { margin: 0; font-size: 0.9rem; color: var(--muted); }
 </style>
 </head>
 
@@ -186,6 +191,18 @@
 
   <h2>Your subscriptions</h2>
   <div id="list"></div>
+
+  <!-- Backup: your list lives only in this browser, so save a copy now and then. -->
+  <h2>Backup</h2>
+  <div class="backup">
+    <p class="note">Your list is saved only in this browser. Clearing your browser data or switching phones erases it, so save a backup file now and then.</p>
+    <div class="buttons">
+      <button class="ghost" type="button" id="exportBtn">Save a backup file</button>
+      <button class="ghost" type="button" id="importBtn">Restore from a backup file</button>
+    </div>
+    <input id="importFile" type="file" accept=".json,application/json" hidden>
+    <div class="error" id="backupMsg" role="status"></div>
+  </div>
 </main>
 
 <script>
@@ -427,9 +444,79 @@
     render();
   }
 
-  // ---------- 5. START THE APP ----------
+  // ---------- 5. BACKUP FILE ----------
+  // Save: download your list as a small .json file.
+  function exportSubs() {
+    const msg = $("backupMsg");
+    if (subs.length === 0) { msg.className = "error"; msg.textContent = "Nothing to save yet."; return; }
+    const blob = new Blob([JSON.stringify({ app: "subscription-tracker", version: 2, subs }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const d = new Date();
+    a.download = "subscriptions-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    msg.className = "error ok";
+    msg.textContent = "Saved " + subs.length + (subs.length === 1 ? " subscription." : " subscriptions.");
+  }
+
+  // Check every entry from a file, so a broken or edited file can't break the app.
+  const CATEGORIES = [...document.querySelectorAll("#category option")].map(o => o.value);
+  function cleanSub(x, i) {
+    if (!x || typeof x !== "object") return null;
+    const name = typeof x.name === "string" ? x.name.trim().slice(0, 60) : "";
+    const cost = Number(x.cost);
+    const date = typeof x.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.date) ? x.date : "";
+    if (!name || !isFinite(cost) || cost < 0 || cost > 100000 || !date || isNaN(new Date(date + "T00:00:00"))) return null;
+    return {
+      id: Number.isFinite(x.id) ? x.id : Date.now() + i,
+      name,
+      category: CATEGORIES.includes(x.category) ? x.category : "Other",
+      cost,
+      cycle: x.cycle === "yearly" ? "yearly" : "monthly",
+      date
+    };
+  }
+
+  // Restore: replace your list with the one in a backup file (after asking).
+  function importSubs(file) {
+    const msg = $("backupMsg");
+    msg.className = "error";
+    if (!file) return;
+    if (file.size > 1000000) { msg.textContent = "That file is too big to be a backup."; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      let list;
+      try {
+        const data = JSON.parse(reader.result);
+        list = Array.isArray(data) ? data : data && data.subs;
+      } catch (e) { list = null; }
+      if (!Array.isArray(list)) { msg.textContent = "That isn't a backup file from this app."; return; }
+      const clean = list.slice(0, 500).map(cleanSub).filter(Boolean);
+      const seen = new Set();
+      for (const s of clean) { while (seen.has(s.id)) s.id++; seen.add(s.id); }   // no two with the same id
+      if (clean.length === 0) { msg.textContent = "No subscriptions found in that file."; return; }
+      const skipped = list.length - clean.length;
+      if (!confirm("Replace your current list (" + subs.length + ") with the " + clean.length + " subscriptions in this file?")) return;
+      subs = clean;
+      saveSubs();
+      stopEdit();
+      render();
+      msg.className = "error ok";
+      msg.textContent = "Restored " + clean.length + (clean.length === 1 ? " subscription" : " subscriptions") + (skipped > 0 ? ". Skipped " + skipped + " that weren't readable." : ".");
+    };
+    reader.onerror = () => { msg.textContent = "Couldn't read that file."; };
+    reader.readAsText(file);
+  }
+
+  // ---------- 6. START THE APP ----------
   $("addForm").addEventListener("submit", handleSubmit);
   $("cancelBtn").addEventListener("click", stopEdit);
+  $("exportBtn").addEventListener("click", exportSubs);
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", e => { importSubs(e.target.files[0]); e.target.value = ""; });
   render();
 </script>
 </body>
